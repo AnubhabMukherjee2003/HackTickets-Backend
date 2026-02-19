@@ -18,27 +18,7 @@ const app  = express();
 const port = process.env.PORT || 3000;
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-const allowedOrigins = [
-  'http://localhost:5173',       // Ionic/Vite dev server
-  'http://localhost:3000',
-  'http://localhost:8100',       // Ionic native dev port
-  'capacitor://localhost',       // Capacitor Android/iOS
-  'ionic://localhost',           // Ionic native webview
-  'http://localhost',            // Android WebView (some versions)
-  'https://hack-tickets-backend.vercel.app',
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    // Allow any vercel.app preview deploy
-    if (origin.endsWith('.vercel.app')) return callback(null, true);
-    callback(new Error(`CORS blocked: ${origin}`));
-  },
-  credentials: true,
-}));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.set('view engine', 'ejs');
 
