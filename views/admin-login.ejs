@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login — HackTickets</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-box {
+      background: white;
+      border-radius: 20px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .logo h1 { font-size: 26px; color: #1a1a2e; margin-bottom: 4px; }
+    .logo p  { font-size: 13px; color: #888; }
+    .badge {
+      display: inline-block;
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffc107;
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #444; }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 15px;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus { border-color: #0f3460; }
+    .otp-hint {
+      background: #e8f4f8;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #0c6291;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .dev-otp {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 16px;
+      color: #856404;
+      display: none;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #0f3460;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #1a4a80; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    .error {
+      background: #fdecea;
+      color: #b71c1c;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .step-indicator {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .step {
+      width: 32px;
+      height: 4px;
+      border-radius: 2px;
+      background: #e0e0e0;
+      transition: background 0.3s;
+    }
+    .step.active { background: #0f3460; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="logo">
+      <h1>🎟️ HackTickets</h1>
+      <p>Decentralized Ticketing System</p>
+    </div>
+    <div style="text-align:center"><span class="badge">🛡️ Admin Panel</span></div>
+
+    <div class="step-indicator">
+      <div class="step active" id="step1-dot"></div>
+      <div class="step" id="step2-dot"></div>
+    </div>
+
+    <div id="error-box" class="error"></div>
+    <div id="dev-otp-box" class="dev-otp"></div>
+
+    <!-- Step 1: Phone -->
+    <div id="step1">
+      <label for="phone">Admin Phone Number</label>
+      <input type="tel" id="phone" placeholder="10-digit number" maxlength="10" inputmode="numeric" />
+      <div class="otp-hint" id="otp-hint">OTP sent! Check server console in dev mode.</div>
+      <button id="send-otp-btn" onclick="sendOtp()">Send OTP</button>
+    </div>
+
+    <!-- Step 2: OTP (hidden initially) -->
+    <div id="step2" style="display:none">
+      <label>OTP Code</label>
+      <input type="number" id="otp" placeholder="6-digit OTP" maxlength="6" inputmode="numeric" />
+      <button onclick="verifyOtp()">Login</button>
+      <button onclick="goBack()" style="margin-top:8px;background:#6c757d">← Change Number</button>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    let currentPhone = '';
+
+    function showError(msg) {
+      const el = document.getElementById('error-box');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function clearError() {
+      document.getElementById('error-box').style.display = 'none';
+    }
+
+    async function sendOtp() {
+      clearError();
+      const phone = document.getElementById('phone').value.trim();
+      if (!/^\d{10}$/.test(phone)) { showError('Enter a valid 10-digit phone number'); return; }
+      currentPhone = phone;
+
+      const btn = document.getElementById('send-otp-btn');
+      btn.disabled = true; btn.textContent = 'Sending…';
+
+      try {
+        const res = await fetch(`${API}/api/auth/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+
+        if (data.otp) {
+          const devBox = document.getElementById('dev-otp-box');
+          devBox.textContent = `🧪 Dev OTP: ${data.otp}`;
+          devBox.style.display = 'block';
+        }
+
+        document.getElementById('step1').style.display = 'none';
+        document.getElementById('step2').style.display = 'block';
+        document.getElementById('step2-dot').classList.add('active');
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Send OTP';
+      }
+    }
+
+    async function verifyOtp() {
+      clearError();
+      const otp = document.getElementById('otp').value.trim();
+      if (!otp) { showError('Enter the OTP'); return; }
+
+      try {
+        const res = await fetch(`${API}/api/auth/verify-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: currentPhone, otp })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Invalid OTP');
+        if (!data.user.isAdmin) throw new Error('This account is not an admin');
+
+        localStorage.setItem('ht_admin_token', data.token);
+        localStorage.setItem('ht_admin_phone', data.user.phone);
+        window.location.href = '/admin';
+      } catch (e) {
+        showError(e.message);
+      }
+    }
+
+    function goBack() {
+      document.getElementById('step1').style.display = 'block';
+      document.getElementById('step2').style.display = 'none';
+      document.getElementById('step2-dot').classList.remove('active');
+      document.getElementById('dev-otp-box').style.display = 'none';
+      clearError();
+    }
+
+    // Enter key support
+    document.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        if (document.getElementById('step1').style.display !== 'none') sendOtp();
+        else verifyOtp();
+      }
+    });
+
+    // Already logged in?
+    if (localStorage.getItem('ht_admin_token')) window.location.href = '/admin';
+  </script>
+</body>
+</html>

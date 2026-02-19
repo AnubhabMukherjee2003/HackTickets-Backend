@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .api-list {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .endpoint {
+            margin: 10px 0;
+            padding: 8px;
+            background: white;
+            border-left: 4px solid #007bff;
+            border-radius: 3px;
+        }
+        .method {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .description {
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><%= title %></h1>
+        <p><strong><%= message %></strong></p>
+        
+        <h2>Available API Endpoints</h2>
+        <div class="api-list">
+            <div class="endpoint">
+                <span class="method">GET</span> /api/health
+                <div class="description">Check system health and blockchain connection</div>
+            </div>
+            <div class="endpoint">
+                <span class="method">POST</span> /api/events
+                <div class="description">Create a new event</div>
+            </div>
+            <div class="endpoint">
+                <span class="method">GET</span> /api/events
+                <div class="description">Get all events</div>
+            </div>
+            <div class="endpoint">
+                <span class="method">GET</span> /api/events/:id
+                <div class="description">Get event by ID</div>
+            </div>
+            <div class="endpoint">
+                <span class="method">POST</span> /api/tickets
+                <div class="description">Mint a new ticket</div>
+            </div>
+            <div class="endpoint">
+                <span class="method">POST</span> /api/tickets/user
+                <div class="description">Get user tickets by phone and event ID</div>
+            </div>
+            <div class="endpoint">
+                <span class="method">GET</span> /api/tickets/:id
+                <div class="description">Get ticket details</div>
+            </div>
+            <div class="endpoint">
+                <span class="method">POST</span> /api/tickets/:id/use
+                <div class="description">Mark ticket as used</div>
+            </div>
+            <div class="endpoint">
+                <span class="method">PATCH</span> /api/events/:id/status
+                <div class="description">Set event active/inactive status</div>
+            </div>
+        </div>
+        
+        <h2>Getting Started</h2>
+        <ol>
+            <li>Make sure Hardhat local network is running</li>
+            <li>Deploy the contract using: <code>npm run deploy</code></li>
+            <li>Import the Postman collection to test the APIs</li>
+            <li>Start with the health check endpoint</li>
+        </ol>
+    </div>
+</body>
+</html>

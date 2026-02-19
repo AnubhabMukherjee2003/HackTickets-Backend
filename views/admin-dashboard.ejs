@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — HackTickets</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      position: fixed; top: 0; left: 0;
+      width: 240px; height: 100vh;
+      background: #1a1a2e; color: white;
+      display: flex; flex-direction: column;
+      z-index: 100;
+    }
+    .sidebar-logo {
+      padding: 24px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .sidebar-logo h2 { font-size: 18px; }
+    .sidebar-logo p  { font-size: 11px; opacity: 0.5; margin-top: 2px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 20px; font-size: 14px; cursor: pointer;
+      text-decoration: none; color: rgba(255,255,255,0.7);
+      transition: all 0.2s; border-left: 3px solid transparent;
+    }
+    .nav-item:hover, .nav-item.active {
+      background: rgba(255,255,255,0.08);
+      color: white; border-left-color: #4a90e2;
+    }
+    .nav-item span { font-size: 18px; }
+    .sidebar-footer {
+      margin-top: auto; padding: 16px 20px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      font-size: 12px; opacity: 0.5;
+    }
+    .logout-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 20px; font-size: 14px; cursor: pointer;
+      color: #ff6b6b; background: none; border: none;
+      width: 100%; text-align: left;
+    }
+    .logout-btn:hover { background: rgba(255,107,107,0.1); }
+
+    /* ── Main content ── */
+    .main { margin-left: 240px; padding: 32px; min-height: 100vh; }
+
+    .page-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 28px;
+    }
+    .page-header h1 { font-size: 24px; color: #1a1a2e; }
+
+    /* ── Stats cards ── */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px; margin-bottom: 32px;
+    }
+    .stat-card {
+      background: white; border-radius: 14px; padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .stat-card .stat-icon { font-size: 28px; margin-bottom: 8px; }
+    .stat-card .stat-value { font-size: 28px; font-weight: 700; color: #1a1a2e; }
+    .stat-card .stat-label { font-size: 12px; color: #888; margin-top: 2px; }
+
+    /* ── Section ── */
+    .section { background: white; border-radius: 14px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 24px; }
+    .section-title {
+      font-size: 16px; font-weight: 700; color: #1a1a2e;
+      margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;
+    }
+
+    /* ── Button ── */
+    .btn {
+      padding: 9px 18px; border-radius: 8px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #0f3460; color: white; }
+    .btn-success { background: #28a745; color: white; }
+    .btn-warning { background: #ffc107; color: #333; }
+    .btn-danger  { background: #dc3545; color: white; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; padding: 10px 12px; background: #f8f9fa; color: #555; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge-success { background: #d4edda; color: #155724; }
+    .badge-danger  { background: #f8d7da; color: #721c24; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 16px; padding: 28px;
+      width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal h3 { font-size: 18px; margin-bottom: 20px; color: #1a1a2e; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #444; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0;
+      border-radius: 8px; font-size: 14px; outline: none;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: #0f3460; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: #1a1a2e; color: white;
+      padding: 12px 20px; border-radius: 10px;
+      font-size: 14px; z-index: 300;
+      transform: translateY(80px); opacity: 0;
+      transition: all 0.3s; pointer-events: none;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { background: #28a745; }
+    .toast.error   { background: #dc3545; }
+
+    /* ── Loading ── */
+    .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #e0e0e0; border-top-color: #0f3460; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <h2>🎟️ HackTickets</h2>
+    <p>Admin Panel</p>
+  </div>
+  <a class="nav-item active" href="/admin" id="nav-dashboard"><span>📊</span> Dashboard</a>
+  <a class="nav-item" href="/admin/events" id="nav-events"><span>🗓️</span> Events</a>
+  <a class="nav-item" href="/admin/scanner" id="nav-scanner"><span>📷</span> QR Scanner</a>
+  <div style="margin-top:auto">
+    <div id="admin-phone-display" style="padding:12px 20px;font-size:12px;opacity:0.5;color:white"></div>
+    <button class="logout-btn" onclick="adminLogout()">🚪 Logout</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="page-header">
+    <h1>Dashboard</h1>
+    <button class="btn btn-primary" onclick="refreshAll()">↺ Refresh</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">🗓️</div>
+      <div class="stat-value" id="stat-total-events"><div class="spinner"></div></div>
+      <div class="stat-label">Total Events</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-value" id="stat-active-events">—</div>
+      <div class="stat-label">Active Events</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🎟️</div>
+      <div class="stat-value" id="stat-tickets-sold">—</div>
+      <div class="stat-label">Tickets Sold</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⛓️</div>
+      <div class="stat-value" id="stat-chain">—</div>
+      <div class="stat-label">Chain ID</div>
+    </div>
+  </div>
+
+  <!-- Recent Events Table -->
+  <div class="section">
+    <div class="section-title">
+      Recent Events
+      <button class="btn btn-primary btn-sm" onclick="openCreateModal()">+ Create Event</button>
+    </div>
+    <div id="events-table-container"><div class="empty-state"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- Create Event Modal -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal">
+    <h3>➕ Create New Event</h3>
+    <div class="form-group">
+      <label>Event Name</label>
+      <input type="text" id="new-name" placeholder="e.g. Tech Summit 2026" />
+    </div>
+    <div class="form-group">
+      <label>Location</label>
+      <input type="text" id="new-location" placeholder="e.g. Mumbai Convention Center" />
+    </div>
+    <div class="form-group">
+      <label>Date & Time</label>
+      <input type="datetime-local" id="new-date" />
+    </div>
+    <div class="form-group">
+      <label>Price (in Wei)</label>
+      <input type="number" id="new-price" placeholder="e.g. 10000000000000000 (= 0.01 ETH)" value="10000000000000000" />
+    </div>
+    <div class="form-group">
+      <label>Capacity</label>
+      <input type="number" id="new-capacity" placeholder="e.g. 500" />
+    </div>
+    <div id="create-error" style="color:#dc3545;font-size:13px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCreateModal()" style="background:#e0e0e0">Cancel</button>
+      <button class="btn btn-primary" onclick="createEvent()">Create Event</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const API = window.location.origin;
+
+  function getToken() {
+    const t = localStorage.getItem('ht_admin_token');
+    if (!t) { window.location.href = '/admin/login'; return null; }
+    return t;
+  }
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` };
+  }
+
+  function showToast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast show ${type}`;
+    setTimeout(() => el.className = 'toast', 3000);
+  }
+
+  function adminLogout() {
+    localStorage.removeItem('ht_admin_token');
+    localStorage.removeItem('ht_admin_phone');
+    window.location.href = '/admin/login';
+  }
+
+  async function loadHealth() {
+    try {
+      const res = await fetch(`${API}/api/health`);
+      const data = await res.json();
+      document.getElementById('stat-chain').textContent = data.chainId || '—';
+    } catch (_) {}
+  }
+
+  async function loadEvents() {
+    try {
+      const res = await fetch(`${API}/api/events`);
+      const events = await res.json();
+
+      const total = events.length;
+      const active = events.filter(e => e.active).length;
+      const sold = events.reduce((s, e) => s + Number(e.ticketsSold), 0);
+
+      document.getElementById('stat-total-events').textContent = total;
+      document.getElementById('stat-active-events').textContent = active;
+      document.getElementById('stat-tickets-sold').textContent = sold;
+
+      const container = document.getElementById('events-table-container');
+      if (events.length === 0) {
+        container.innerHTML = '<div class="empty-state">No events yet. Create one!</div>';
+        return;
+      }
+
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Name</th><th>Location</th><th>Date</th>
+              <th>Tickets</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${events.map(ev => `
+              <tr>
+                <td>#${ev.eventId}</td>
+                <td><strong>${ev.name}</strong></td>
+                <td>${ev.location}</td>
+                <td>${new Date(Number(ev.date) * 1000).toLocaleDateString()}</td>
+                <td>${ev.ticketsSold} / ${ev.capacity}</td>
+                <td>
+                  <span class="badge ${ev.active ? 'badge-success' : 'badge-danger'}">
+                    ${ev.active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td>
+                  <button class="btn btn-sm ${ev.active ? 'btn-warning' : 'btn-success'}"
+                    onclick="toggleStatus(${ev.eventId}, ${!ev.active})">
+                    ${ev.active ? 'Deactivate' : 'Activate'}
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (e) {
+      document.getElementById('events-table-container').innerHTML =
+        `<div class="empty-state">Failed to load events: ${e.message}</div>`;
+    }
+  }
+
+  async function toggleStatus(eventId, active) {
+    try {
+      const res = await fetch(`${API}/api/admin/events/${eventId}/status`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ active })
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      showToast(`Event ${active ? 'activated' : 'deactivated'}`);
+      loadEvents();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  function openCreateModal() {
+    document.getElementById('create-modal').classList.add('open');
+    // Default date to now + 7 days
+    const d = new Date(Date.now() + 7 * 86400000);
+    document.getElementById('new-date').value = d.toISOString().slice(0, 16);
+  }
+
+  function closeCreateModal() {
+    document.getElementById('create-modal').classList.remove('open');
+    document.getElementById('create-error').style.display = 'none';
+  }
+
+  async function createEvent() {
+    const name     = document.getElementById('new-name').value.trim();
+    const location = document.getElementById('new-location').value.trim();
+    const dateVal  = document.getElementById('new-date').value;
+    const price    = document.getElementById('new-price').value.trim();
+    const capacity = document.getElementById('new-capacity').value.trim();
+    const errEl    = document.getElementById('create-error');
+
+    if (!name || !location || !dateVal || !price || !capacity) {
+      errEl.textContent = 'All fields are required'; errEl.style.display = 'block'; return;
+    }
+
+    const dateUnix = Math.floor(new Date(dateVal).getTime() / 1000);
+
+    try {
+      const res = await fetch(`${API}/api/admin/events`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ name, location, date: dateUnix, price, capacity })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast(`Event created! ID: ${data.eventId}`);
+      closeCreateModal();
+      loadEvents();
+    } catch (e) {
+      errEl.textContent = e.message; errEl.style.display = 'block';
+    }
+  }
+
+  function refreshAll() { loadHealth(); loadEvents(); }
+
+  // Init
+  const token = getToken();
+  if (token) {
+    const phone = localStorage.getItem('ht_admin_phone');
+    if (phone) document.getElementById('admin-phone-display').textContent = `📱 ${phone}`;
+    refreshAll();
+  }
+</script>
+</body>
+</html>

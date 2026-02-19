@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Scanner — HackTickets Admin</title>
+  <!-- html5-qrcode from CDN -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; }
+
+    .sidebar {
+      position: fixed; top: 0; left: 0;
+      width: 240px; height: 100vh;
+      background: #1a1a2e; color: white;
+      display: flex; flex-direction: column; z-index: 100;
+    }
+    .sidebar-logo { padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-logo h2 { font-size: 18px; }
+    .sidebar-logo p  { font-size: 11px; opacity: 0.5; margin-top: 2px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 20px; font-size: 14px; cursor: pointer;
+      text-decoration: none; color: rgba(255,255,255,0.7);
+      transition: all 0.2s; border-left: 3px solid transparent;
+    }
+    .nav-item:hover, .nav-item.active {
+      background: rgba(255,255,255,0.08); color: white; border-left-color: #4a90e2;
+    }
+    .nav-item span { font-size: 18px; }
+    .logout-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 20px; font-size: 14px; cursor: pointer;
+      color: #ff6b6b; background: none; border: none; width: 100%; text-align: left;
+    }
+    .logout-btn:hover { background: rgba(255,107,107,0.1); }
+
+    .main { margin-left: 240px; padding: 32px; min-height: 100vh; }
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-size: 24px; color: #1a1a2e; }
+    .page-header p  { font-size: 14px; color: #888; margin-top: 4px; }
+
+    /* ── Scanner layout ── */
+    .scanner-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .card {
+      background: white; border-radius: 14px; padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .card-title {
+      font-size: 15px; font-weight: 700; color: #1a1a2e;
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+
+    /* Camera feed */
+    #qr-reader {
+      width: 100%; border-radius: 12px; overflow: hidden;
+      border: 2px solid #e0e0e0;
+    }
+    #qr-reader video { border-radius: 10px; }
+
+    /* Controls */
+    .btn {
+      padding: 10px 20px; border-radius: 8px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #0f3460; color: white; }
+    .btn-success { background: #28a745; color: white; }
+    .btn-danger  { background: #dc3545; color: white; }
+    .btn-warning { background: #ffc107; color: #333; }
+    .btn-outline { background: white; border: 2px solid #0f3460; color: #0f3460; }
+
+    .btn-group { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+    /* Ticket result */
+    .ticket-result { display: none; }
+    .ticket-result.visible { display: block; }
+
+    .ticket-info {
+      background: #f8f9fa; border-radius: 10px; padding: 16px;
+      margin-bottom: 16px;
+    }
+    .info-row {
+      display: flex; justify-content: space-between;
+      padding: 6px 0; font-size: 14px;
+      border-bottom: 1px solid #eee;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: #888; font-size: 12px; }
+    .info-row .value { font-weight: 600; }
+
+    .badge {
+      display: inline-block; padding: 3px 10px;
+      border-radius: 20px; font-size: 11px; font-weight: 600;
+    }
+    .badge-success { background: #d4edda; color: #155724; }
+    .badge-danger  { background: #f8d7da; color: #721c24; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+
+    /* OTP confirm */
+    .confirm-section {
+      border-top: 2px dashed #e0e0e0; padding-top: 16px; margin-top: 16px;
+    }
+    .confirm-section h4 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+    .input-group { margin-bottom: 12px; }
+    .input-group label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; }
+    .input-group input {
+      width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0;
+      border-radius: 8px; font-size: 15px; outline: none; letter-spacing: 2px;
+    }
+    .input-group input:focus { border-color: #0f3460; }
+
+    /* Status states */
+    .status-idle    { color: #888; }
+    .status-scanning { color: #0f3460; }
+    .status-success { color: #28a745; }
+    .status-error   { color: #dc3545; }
+
+    .scan-status {
+      text-align: center; padding: 12px;
+      border-radius: 8px; font-size: 14px; font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .scan-status.idle    { background: #f8f9fa; color: #888; }
+    .scan-status.success { background: #d4edda; color: #155724; }
+    .scan-status.error   { background: #f8d7da; color: #721c24; }
+    .scan-status.warning { background: #fff3cd; color: #856404; }
+
+    /* History */
+    .history-list { max-height: 300px; overflow-y: auto; }
+    .history-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;
+    }
+    .history-item:last-child { border-bottom: none; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: #1a1a2e; color: white;
+      padding: 12px 20px; border-radius: 10px;
+      font-size: 14px; z-index: 300;
+      transform: translateY(80px); opacity: 0;
+      transition: all 0.3s; pointer-events: none;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { background: #28a745; }
+    .toast.error   { background: #dc3545; }
+
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 900px) { .scanner-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <h2>🎟️ HackTickets</h2>
+    <p>Admin Panel</p>
+  </div>
+  <a class="nav-item" href="/admin"><span>📊</span> Dashboard</a>
+  <a class="nav-item" href="/admin/events"><span>🗓️</span> Events</a>
+  <a class="nav-item active" href="/admin/scanner"><span>📷</span> QR Scanner</a>
+  <div style="margin-top:auto">
+    <div id="admin-phone-display" style="padding:12px 20px;font-size:12px;opacity:0.5;color:white"></div>
+    <button class="logout-btn" onclick="adminLogout()">🚪 Logout</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="page-header">
+    <h1>📷 QR Scanner</h1>
+    <p>Scan attendee QR codes to grant entry</p>
+  </div>
+
+  <!-- Manual URL input -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title">🔗 Enter QR Verify URL</div>
+    <p style="font-size:13px;color:#666;margin-bottom:12px">Paste the verify URL shown below the QR code in the app to look up a ticket without scanning.</p>
+    <div style="display:flex;gap:10px;align-items:flex-start">
+      <div style="flex:1">
+        <input
+          type="text"
+          id="manual-url-input"
+          placeholder="http://localhost:3000/verifyme/{ticketId}/{token}"
+          style="width:100%;padding:10px 14px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;outline:none;font-family:monospace"
+          onkeydown="if(event.key==='Enter') lookupManualUrl()"
+          onfocus="this.style.borderColor='#0f3460'"
+          onblur="this.style.borderColor='#e0e0e0'"
+        />
+      </div>
+      <button class="btn btn-primary" onclick="lookupManualUrl()" style="white-space:nowrap">🔍 Look Up</button>
+      <button class="btn btn-outline" onclick="document.getElementById('manual-url-input').value=''">✕ Clear</button>
+    </div>
+    <div id="manual-url-error" style="color:#dc3545;font-size:13px;margin-top:8px;display:none"></div>
+  </div>
+
+  <div class="scanner-grid">
+    <!-- Left: Camera -->
+    <div>
+      <div class="card">
+        <div class="card-title">📷 Camera</div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="start-btn" onclick="startScanner()">▶ Start Scanner</button>
+          <button class="btn btn-danger" id="stop-btn" onclick="stopScanner()" disabled>⏹ Stop</button>
+        </div>
+        <div id="scan-status" class="scan-status idle">Idle — press Start to scan</div>
+        <div id="qr-reader"></div>
+      </div>
+
+      <!-- Scan History -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">📋 Scan History
+          <button class="btn btn-outline" style="margin-left:auto;padding:4px 10px;font-size:12px" onclick="clearHistory()">Clear</button>
+        </div>
+        <div id="history-list" class="history-list">
+          <div style="text-align:center;color:#aaa;font-size:13px;padding:20px">No scans yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Ticket info + confirm -->
+    <div>
+      <div class="card">
+        <div class="card-title">🎟️ Scanned Ticket</div>
+
+        <div id="no-scan" style="text-align:center;color:#aaa;padding:40px 20px;font-size:14px">
+          Scan a QR code to see ticket details here
+        </div>
+
+        <div class="ticket-result" id="ticket-result">
+          <div class="ticket-info" id="ticket-info"></div>
+
+          <div class="confirm-section">
+            <h4>🔐 Verify Identity</h4>
+            <p style="font-size:13px;color:#666;margin-bottom:12px">
+              Ask the attendee to verbally confirm their phone number, then enter the OTP they received.
+            </p>
+
+            <div class="input-group">
+              <label>Attendee Phone Number</label>
+              <input type="tel" id="confirm-phone" placeholder="10-digit number" maxlength="10" inputmode="numeric" />
+            </div>
+            <div class="input-group">
+              <label>OTP (sent to attendee)</label>
+              <input type="number" id="confirm-otp" placeholder="6-digit OTP" maxlength="6" inputmode="numeric" />
+            </div>
+
+            <div id="confirm-error" style="color:#dc3545;font-size:13px;margin-bottom:10px;display:none"></div>
+
+            <div class="btn-group">
+              <button class="btn btn-success" id="confirm-btn" onclick="confirmEntry()">
+                ✅ Confirm Entry
+              </button>
+              <button class="btn btn-outline" onclick="resetScanner()">🔄 Scan Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const API = window.location.origin;
+  let html5QrCode = null;
+  let currentTicketId = null;
+  let scanHistory = [];
+  let isProcessing = false;
+
+  function getToken() {
+    const t = localStorage.getItem('ht_admin_token');
+    if (!t) { window.location.href = '/admin/login'; return null; }
+    return t;
+  }
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` };
+  }
+
+  function showToast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast show ${type}`;
+    setTimeout(() => el.className = 'toast', 3500);
+  }
+
+  function setScanStatus(msg, type = 'idle') {
+    const el = document.getElementById('scan-status');
+    el.textContent = msg;
+    el.className = `scan-status ${type}`;
+  }
+
+  function adminLogout() {
+    localStorage.removeItem('ht_admin_token');
+    localStorage.removeItem('ht_admin_phone');
+    window.location.href = '/admin/login';
+  }
+
+  async function startScanner() {
+    if (html5QrCode) return;
+
+    html5QrCode = new Html5Qrcode('qr-reader');
+    document.getElementById('start-btn').disabled = true;
+    document.getElementById('stop-btn').disabled = false;
+    setScanStatus('Scanning… point at a QR code', 'scanning');
+
+    try {
+      await html5QrCode.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 260, height: 260 } },
+        onQrSuccess,
+        () => {}  // ignore errors during scan
+      );
+    } catch (e) {
+      setScanStatus(`Camera error: ${e}`, 'error');
+      html5QrCode = null;
+      document.getElementById('start-btn').disabled = false;
+      document.getElementById('stop-btn').disabled = true;
+    }
+  }
+
+  async function stopScanner() {
+    if (html5QrCode) {
+      await html5QrCode.stop();
+      html5QrCode.clear();
+      html5QrCode = null;
+    }
+    document.getElementById('start-btn').disabled = false;
+    document.getElementById('stop-btn').disabled = true;
+    setScanStatus('Idle — press Start to scan', 'idle');
+  }
+
+  async function onQrSuccess(decodedText) {
+    if (isProcessing) return;
+    isProcessing = true;
+    setScanStatus('Processing QR…', 'scanning');
+
+    // Expected format: http://localhost:3000/verifyme/:ticketId/:userToken
+    const match = decodedText.match(/\/verifyme\/(\w+)\/(.+)$/);
+    if (!match) {
+      setScanStatus('Invalid QR code format', 'error');
+      showToast('Invalid QR code', 'error');
+      setTimeout(() => { isProcessing = false; setScanStatus('Scanning…', 'scanning'); }, 2000);
+      return;
+    }
+
+    const ticketId  = match[1];
+    const userToken = match[2];
+
+    try {
+      const res = await fetch(`${API}/verifyme/${ticketId}/${userToken}`, {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setScanStatus(`❌ ${data.error}`, 'error');
+        showToast(data.error, 'error');
+        addHistory(ticketId, 'error', data.error);
+        setTimeout(() => { isProcessing = false; setScanStatus('Scanning…', 'scanning'); }, 3000);
+        return;
+      }
+
+      currentTicketId = data.ticketId;
+      showTicketInfo(data);
+      setScanStatus('✅ Ticket found — verify identity below', 'success');
+      addHistory(ticketId, 'success', data.eventName);
+      await stopScanner();
+
+    } catch (e) {
+      setScanStatus(`Error: ${e.message}`, 'error');
+      setTimeout(() => { isProcessing = false; }, 2000);
+    }
+  }
+
+  function showTicketInfo(data) {
+    document.getElementById('no-scan').style.display = 'none';
+    document.getElementById('ticket-result').classList.add('visible');
+
+    const used = data.used;
+    const date = new Date(Number(data.eventDate) * 1000).toLocaleString();
+
+    document.getElementById('ticket-info').innerHTML = `
+      <div class="info-row">
+        <span class="label">Ticket ID</span>
+        <span class="value">#${data.ticketId}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Event</span>
+        <span class="value">${data.eventName}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Location</span>
+        <span class="value">${data.eventLocation}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Date</span>
+        <span class="value">${date}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Phone</span>
+        <span class="value">${data.phone}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Status</span>
+        <span class="value">
+          <span class="badge ${used ? 'badge-danger' : 'badge-success'}">
+            ${used ? '⚠ Already Used' : '✅ Valid'}
+          </span>
+        </span>
+      </div>
+      ${data.otp ? `<div class="info-row">
+        <span class="label">Dev OTP</span>
+        <span class="value" style="color:#856404;font-family:monospace">${data.otp}</span>
+      </div>` : ''}
+    `;
+
+    // Pre-fill phone
+    document.getElementById('confirm-phone').value = data.phone;
+    document.getElementById('confirm-btn').disabled = used;
+    if (used) {
+      document.getElementById('confirm-error').textContent = 'This ticket has already been used.';
+      document.getElementById('confirm-error').style.display = 'block';
+    }
+  }
+
+  async function confirmEntry() {
+    const phone = document.getElementById('confirm-phone').value.trim();
+    const otp   = document.getElementById('confirm-otp').value.trim();
+    const errEl = document.getElementById('confirm-error');
+    errEl.style.display = 'none';
+
+    if (!phone || !/^\d{10}$/.test(phone)) { errEl.textContent = 'Valid 10-digit phone required'; errEl.style.display = 'block'; return; }
+    if (!otp) { errEl.textContent = 'Enter the OTP'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('confirm-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Confirming…';
+
+    try {
+      const res = await fetch(`${API}/api/entry/confirm`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ ticketId: currentTicketId, phone, otp })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      showToast('🎉 Entry granted!', 'success');
+      setScanStatus('🎉 Entry granted! Ready for next scan.', 'success');
+
+      // Update ticket info display
+      document.getElementById('ticket-info').insertAdjacentHTML('beforeend', `
+        <div class="info-row" style="background:#d4edda;margin-top:8px;border-radius:8px;padding:10px">
+          <span style="color:#155724;font-weight:700">✅ Entry Confirmed</span>
+          <span style="font-size:11px;color:#555">Tx: ${data.transactionHash.slice(0,16)}…</span>
+        </div>
+      `);
+
+      btn.style.display = 'none';
+      setTimeout(resetScanner, 4000);
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.innerHTML = '✅ Confirm Entry';
+    }
+  }
+
+  function resetScanner() {
+    currentTicketId = null;
+    isProcessing = false;
+    document.getElementById('no-scan').style.display = 'block';
+    document.getElementById('ticket-result').classList.remove('visible');
+    document.getElementById('confirm-phone').value = '';
+    document.getElementById('confirm-otp').value = '';
+    document.getElementById('confirm-error').style.display = 'none';
+    document.getElementById('confirm-btn').disabled = false;
+    document.getElementById('confirm-btn').innerHTML = '✅ Confirm Entry';
+    setScanStatus('Idle — press Start to scan', 'idle');
+  }
+
+  function addHistory(ticketId, status, detail) {
+    scanHistory.unshift({ ticketId, status, detail, time: new Date().toLocaleTimeString() });
+    renderHistory();
+  }
+
+  function clearHistory() { scanHistory = []; renderHistory(); }
+
+  function renderHistory() {
+    const el = document.getElementById('history-list');
+    if (scanHistory.length === 0) {
+      el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:20px">No scans yet</div>';
+      return;
+    }
+    el.innerHTML = scanHistory.map(h => `
+      <div class="history-item">
+        <div>
+          <strong>#${h.ticketId}</strong>
+          <span style="margin-left:8px;font-size:12px;color:#888">${h.detail}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge ${h.status === 'success' ? 'badge-success' : 'badge-danger'}">
+            ${h.status === 'success' ? '✓' : '✗'}
+          </span>
+          <span style="font-size:11px;color:#aaa">${h.time}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function lookupManualUrl() {
+    const input = document.getElementById('manual-url-input');
+    const errEl = document.getElementById('manual-url-error');
+    const url = input.value.trim();
+    errEl.style.display = 'none';
+
+    if (!url) {
+      errEl.textContent = 'Please paste a verify URL first.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    const match = url.match(/\/verifyme\/(\w+)\/(.+)$/);
+    if (!match) {
+      errEl.textContent = 'Invalid URL format. Expected: /verifyme/{ticketId}/{token}';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    isProcessing = true;
+    setScanStatus('Looking up ticket…', 'scanning');
+
+    const ticketId  = match[1];
+    const userToken = match[2];
+
+    try {
+      const res = await fetch(`${API}/verifyme/${ticketId}/${userToken}`, {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setScanStatus(`❌ ${data.error}`, 'error');
+        errEl.textContent = data.error;
+        errEl.style.display = 'block';
+        showToast(data.error, 'error');
+        addHistory(ticketId, 'error', data.error);
+        isProcessing = false;
+        return;
+      }
+
+      currentTicketId = data.ticketId;
+      showTicketInfo(data);
+      setScanStatus('✅ Ticket found — verify identity below', 'success');
+      addHistory(ticketId, 'success', data.eventName);
+      input.value = '';
+
+      // Scroll to ticket result
+      document.getElementById('ticket-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {
+      errEl.textContent = `Error: ${e.message}`;
+      errEl.style.display = 'block';
+      isProcessing = false;
+    }
+  }
+
+  // Init
+  const token = getToken();
+  if (token) {
+    const phone = localStorage.getItem('ht_admin_phone');
+    if (phone) document.getElementById('admin-phone-display').textContent = `📱 ${phone}`;
+  }
+</script>
+</body>
+</html>
